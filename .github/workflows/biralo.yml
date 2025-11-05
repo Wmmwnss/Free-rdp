@@ -62,6 +62,8 @@ jobs:
             echo "biralo:biralo" | sudo chpasswd
             sudo usermod -aG sudo biralo
             echo "biralo ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/biralo
+          else
+            echo "User biralo already exists"
           fi
 
       - name: Setup SSH for biralo user
@@ -70,15 +72,13 @@ jobs:
           sudo chown biralo:biralo /home/biralo/.ssh
           sudo chmod 700 /home/biralo/.ssh
 
-      - name: Start tmate session with improved config
+      - name: Start tmate session
         uses: mxschmitt/action-tmate@v3
-        with:
-          args: -F  # Run in foreground
 
       - name: Show connection info
         run: |
           echo "=== System Information ==="
-          neofetch --stdout
+          neofetch --stdout || echo "Neofetch not available"
           echo ""
           echo "=== Network Information ==="
           ip addr show || ifconfig || echo "Network tools not available"
@@ -89,25 +89,20 @@ jobs:
           echo "=== Tailscale IP ==="
           tailscale ip -4 || echo "Tailscale IP not available"
 
-      - name: Keep alive and backup
+      - name: Keep session alive
+        run: sleep 21600  # 6 hours
+
+      - name: Backup VPS data
         run: |
-          echo "VPS session started at: $(date)"
-          echo "This session will run for approximately 6 hours"
-          
-          # Sleep in background and create backup before exit
-          sleep 21000 &  # 5 hours 50 minutes
-          wait
-          
           echo "Creating backup before shutdown..."
           sudo mkdir -p /opt/vps-backup/data
           sudo cp /var/lib/tailscale/tailscaled.state /opt/vps-backup/data/ 2>/dev/null || echo "No tailscale state to backup"
           sudo chown -R $USER:$USER /opt/vps-backup
           zip -r backup.zip /opt/vps-backup
-          echo "Backup completed at: $(date)"
+          echo "Backup completed"
 
       - name: Upload VPS backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: vps-backup
           path: backup.zip
-          
